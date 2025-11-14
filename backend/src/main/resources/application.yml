@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/ianct_chinese?useSSL=false&useUnicode=true&characterEncoding=utf8
+    username: root
+    password: QTSqts1030+
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.springframework.web: INFO
+    com.ianctchinese: DEBUG
