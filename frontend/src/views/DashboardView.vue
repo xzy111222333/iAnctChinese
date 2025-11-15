@@ -3,6 +3,19 @@
     <div class="stage-actions">
       <TextUploadDrawer />
       <el-button @click="store.initDashboard()">刷新数据</el-button>
+      <div class="user-menu">
+        <el-dropdown>
+          <span class="user-info">
+            {{ authStore.user?.username || '用户' }}
+            <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
     </div>
 
     <div class="stage-nav">
@@ -137,7 +150,11 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useTextStore } from "@/store/textStore";
+import { useAuthStore } from "@/store/authStore";
+import { ArrowDown } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import FilterPanel from "@/components/filters/FilterPanel.vue";
 import GraphView from "@/components/visualizations/GraphView.vue";
 import TimelineView from "@/components/visualizations/TimelineView.vue";
@@ -149,15 +166,23 @@ import FamilyTreeView from "@/components/visualizations/FamilyTreeView.vue";
 import BattleTimelineView from "@/components/visualizations/BattleTimelineView.vue";
 import TextWorkspace from "./TextWorkspace.vue";
 
+const router = useRouter();
 const store = useTextStore();
-const viewType = ref("graph");
+const authStore = useAuthStore();
+const viewType = ref("stats");
 const stage = ref("structure");
 const searchDialogVisible = ref(false);
 
+const handleLogout = () => {
+  authStore.logout();
+  ElMessage.success('已退出登录');
+  router.push('/');
+};
+
 const stageOptions = [
-  { value: "structure", label: "结构标注", icon: "🧩" },
-  { value: "analysis", label: "词云统计", icon: "☁️" },
-  { value: "graph", label: "知识图谱", icon: "🗺️" }
+  { value: "structure", label: "结构标注", icon: "S" },
+  { value: "analysis", label: "词云统计", icon: "A" },
+  { value: "graph", label: "知识图谱", icon: "G" }
 ];
 
 const labelMap = {
@@ -379,5 +404,22 @@ const translateRelation = (type) => {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.user-menu {
+  margin-left: auto;
+}
+
+.user-info {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: background-color 0.3s;
+}
+
+.user-info:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 </style>

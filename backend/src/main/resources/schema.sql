@@ -1,4 +1,17 @@
 -- Reference schema for the iAnctChinese platform.
+
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(100) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  create_time DATETIME NOT NULL,
+  last_login_time DATETIME,
+  enabled BIT DEFAULT 1,
+  INDEX idx_username (username),
+  INDEX idx_email (email)
+);
+
 CREATE TABLE IF NOT EXISTS texts (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   title VARCHAR(255) NOT NULL,
