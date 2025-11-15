@@ -84,7 +84,6 @@
         <section class="panel view-panel">
           <div class="view-toggle">
             <el-radio-group v-model="viewType">
-              <el-radio-button label="stats">统计</el-radio-button>
               <el-radio-button label="graph">知识图谱</el-radio-button>
               <el-radio-button label="timeline">时间轴</el-radio-button>
               <el-radio-button label="map">地图</el-radio-button>
@@ -214,23 +213,14 @@ const componentMap = {
   graph: GraphView,
   timeline: TimelineView,
   map: MapView,
-  stats: StatsPanel,
   family: FamilyTreeView,
   battle: BattleTimelineView
 };
 
-const currentComponent = computed(() => componentMap[viewType.value] || StatsPanel);
+const currentComponent = computed(() => componentMap[viewType.value] || GraphView);
 
 const viewProps = computed(() => {
   switch (viewType.value) {
-    case "graph":
-      return {
-        entities: store.entities,
-        relations: store.relations,
-        highlightOnly: store.filters.highlightOnly,
-        activeEntityCategories: store.filters.entityCategories,
-        activeRelationTypes: store.filters.relationTypes
-      };
     case "timeline":
       return { milestones: insights.value?.timeline || [] };
     case "map":
@@ -239,11 +229,14 @@ const viewProps = computed(() => {
       return { events: insights.value?.battleTimeline || [] };
     case "family":
       return { nodes: insights.value?.familyTree || [] };
+    case "graph":
     default:
       return {
-        words: insights.value?.wordCloud || [],
-        stats: insights.value?.stats || {},
-        analysisSummary: insights.value?.analysisSummary || ""
+        entities: store.entities,
+        relations: store.relations,
+        highlightOnly: store.filters.highlightOnly,
+        activeEntityCategories: store.filters.entityCategories,
+        activeRelationTypes: store.filters.relationTypes
       };
   }
 });
