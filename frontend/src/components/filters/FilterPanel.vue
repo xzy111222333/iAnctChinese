@@ -196,7 +196,8 @@ const legendItems = [
 
 <style scoped>
 .nav-tree {
-  max-height: 260px;
+  max-height: 360px;
+  min-height: 280px;
   overflow: auto;
   margin-bottom: 16px;
 }
@@ -208,9 +209,10 @@ const legendItems = [
 .filter-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  height: calc(100vh - 160px);
+  gap: 16px;
+  height: calc(100vh - 120px);
   overflow: auto;
+  padding-bottom: 12px;
 }
 
 .legend {
