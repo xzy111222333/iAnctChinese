@@ -32,10 +32,11 @@ logging:
     com.ianctchinese: DEBUG
     org.springframework.web: INFO
 
+# backend/src/main/resources/application.yml
 huggingface:
-  api-token: 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
+  api-token: ${HUGGINGFACE_API_TOKEN:}
   model: qwen/Qwen3-0.6B
-
 deepseek:
-  api-key: sk-9dfefa695d064f3983fbf2ff09f683c8
+  api-key: ${DEEPSEEK_API_KEY:}
+
 
