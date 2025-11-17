@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { fetchTexts, fetchTextById, uploadText, updateTextCategory, exportText, deleteText as deleteTextApi } from "@/api/texts";
+import { fetchTexts, fetchTextById, uploadText, updateTextCategory, exportText, deleteText as deleteTextApi, updateText as updateTextApi } from "@/api/texts";
 import { fetchEntities, fetchRelations, createEntity, createRelation } from "@/api/annotations";
 import { classifyText, fetchInsights, autoAnnotate, runFullAnalysis as runFullAnalysisApi } from "@/api/analysis";
 import { fetchSections, autoSegment, updateSection as updateSectionApi } from "@/api/sections";
@@ -136,9 +136,23 @@ export const useTextStore = defineStore("textStore", {
       if (!this.selectedTextId) {
         return;
       }
-      const { data } = await classifyText(this.selectedTextId);
-      this.classification = data;
-      await this.selectText(this.selectedTextId);
+      this.loading = true;
+      try {
+        const { data } = await classifyText(this.selectedTextId);
+        this.classification = data;
+        if (data?.suggestedCategory) {
+          if (this.selectedText) {
+            this.selectedText.category = data.suggestedCategory;
+          }
+          const idx = this.texts.findIndex((item) => item.id === this.selectedTextId);
+          if (idx >= 0) {
+            this.texts[idx].category = data.suggestedCategory;
+          }
+          await this.loadNavigationTree();
+        }
+      } finally {
+        this.loading = false;
+      }
     },
     async triggerAutoAnnotation() {
       if (!this.selectedTextId) {
@@ -147,13 +161,13 @@ export const useTextStore = defineStore("textStore", {
       await autoAnnotate(this.selectedTextId);
       await this.selectText(this.selectedTextId);
     },
-    async runFullAnalysis() {
+    async runFullAnalysis(model) {
       if (!this.selectedTextId) {
         return;
       }
       this.loading = true;
       try {
-        const { data } = await runFullAnalysisApi(this.selectedTextId);
+        const { data } = await runFullAnalysisApi(this.selectedTextId, model);
         this.classification = data.classification;
         this.insights = data.insights;
         this.sections = data.sections || [];
@@ -264,7 +278,10 @@ export const useTextStore = defineStore("textStore", {
       if (!id) {
         return;
       }
+      // 乐观更新：先从前端列表剔除
+      this.texts = this.texts.filter((item) => item.id !== id);
       await deleteTextApi(id);
+      // 再刷新服务器数据，确保一致
       await this.loadTexts();
       if (this.selectedTextId === id) {
         this.selectedTextId = null;
@@ -276,6 +293,14 @@ export const useTextStore = defineStore("textStore", {
         this.classification = null;
       }
       await this.loadNavigationTree();
+    },
+    async updateText(id, payload) {
+      const { data } = await updateTextApi(id, payload);
+      await this.loadTexts();
+      if (this.selectedTextId === id) {
+        this.selectedText = data;
+      }
+      return data;
     }
   }
 });

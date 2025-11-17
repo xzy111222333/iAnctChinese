@@ -54,6 +54,10 @@ public class TextDocument {
   private LocalDateTime updatedAt;
 
   @Builder.Default
+  @Column(name = "is_deleted", nullable = false)
+  private Boolean isDeleted = false;
+
+  @Builder.Default
   @OneToMany(mappedBy = "textDocument", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<TextSection> sections = new ArrayList<>();
 }

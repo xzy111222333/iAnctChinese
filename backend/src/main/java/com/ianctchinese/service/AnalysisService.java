@@ -13,5 +13,5 @@ public interface AnalysisService {
 
   AutoAnnotationResponse autoAnnotate(Long textId);
 
-  ModelAnalysisResponse runFullAnalysis(Long textId);
+  ModelAnalysisResponse runFullAnalysis(Long textId, String provider);
 }

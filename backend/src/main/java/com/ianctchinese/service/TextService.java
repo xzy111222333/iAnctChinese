@@ -17,4 +17,6 @@ public interface TextService {
   List<TextDocument> searchTexts(String keyword);
 
   void deleteText(Long id);
+
+  TextDocument updateText(Long id, com.ianctchinese.dto.TextUpdateRequest request);
 }

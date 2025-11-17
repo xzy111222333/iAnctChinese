@@ -84,11 +84,13 @@
         <section class="panel view-panel">
           <div class="view-toggle">
             <el-radio-group v-model="viewType">
-              <el-radio-button label="graph">知识图谱</el-radio-button>
-              <el-radio-button label="timeline">时间轴</el-radio-button>
-              <el-radio-button label="map">地图</el-radio-button>
-              <el-radio-button label="battle">对抗视图</el-radio-button>
-              <el-radio-button label="family">亲情树</el-radio-button>
+              <el-radio-button
+                v-for="option in viewOptions"
+                :key="option.value"
+                :label="option.value"
+              >
+                {{ option.label }}
+              </el-radio-button>
             </el-radio-group>
             <div class="recommended" v-if="insights?.recommendedViews?.length">
               <span>推荐视图：</span>
@@ -170,7 +172,7 @@ const router = useRouter();
 const route = useRoute();
 const store = useTextStore();
 const authStore = useAuthStore();
-const viewType = ref("stats");
+const viewType = ref("graph");
 const stage = ref("structure");
 const searchDialogVisible = ref(false);
 
@@ -224,6 +226,48 @@ watch(
 );
 
 const insights = computed(() => store.insights);
+
+const viewPresets = {
+  travelogue: [
+    { value: "map", label: "地图轨迹" },
+    { value: "timeline", label: "行程时间轴" },
+    { value: "graph", label: "知识图谱" }
+  ],
+  warfare: [
+    { value: "battle", label: "对抗视图" },
+    { value: "timeline", label: "战事时间轴" },
+    { value: "graph", label: "知识图谱" }
+  ],
+  biography: [
+    { value: "family", label: "亲情树" },
+    { value: "timeline", label: "生平时间轴" },
+    { value: "graph", label: "知识图谱" }
+  ],
+  default: [
+    { value: "graph", label: "知识图谱" },
+    { value: "timeline", label: "时间轴" },
+    { value: "map", label: "地图" }
+  ]
+};
+
+const viewOptions = computed(() => {
+  const category = store.selectedText?.category;
+  if (category && viewPresets[category]) {
+    return viewPresets[category];
+  }
+  return viewPresets.default;
+});
+
+watch(
+  () => store.selectedText?.category,
+  () => {
+    const options = viewOptions.value;
+    if (!options.find((opt) => opt.value === viewType.value)) {
+      viewType.value = options[0]?.value || "graph";
+    }
+  },
+  { immediate: true }
+);
 
 const componentMap = {
   graph: GraphView,

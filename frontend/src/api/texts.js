@@ -18,6 +18,10 @@ export const updateTextCategory = (id, category) => {
   return apiClient.patch(`/texts/${id}/category`, { category });
 };
 
+export const updateText = (id, payload) => {
+  return apiClient.patch(`/texts/${id}`, payload);
+};
+
 export const exportText = (id) => {
   return apiClient.get(`/texts/${id}/export`, { responseType: "blob" });
 };

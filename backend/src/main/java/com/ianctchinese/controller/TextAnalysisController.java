@@ -31,8 +31,10 @@ public class TextAnalysisController {
   }
 
   @PostMapping("/{textId}/full")
-  public ResponseEntity<ModelAnalysisResponse> fullAnalysis(@PathVariable("textId") Long textId) {
-    return ResponseEntity.ok(analysisService.runFullAnalysis(textId));
+  public ResponseEntity<ModelAnalysisResponse> fullAnalysis(@PathVariable("textId") Long textId,
+      @org.springframework.web.bind.annotation.RequestParam(value = "model", required = false)
+      String provider) {
+    return ResponseEntity.ok(analysisService.runFullAnalysis(textId, provider));
   }
 
   @GetMapping("/{textId}/insights")

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ianctchinese.dto.TextCategoryUpdateRequest;
 import com.ianctchinese.dto.TextUploadRequest;
+import com.ianctchinese.dto.TextUpdateRequest;
 import com.ianctchinese.model.TextDocument;
 import com.ianctchinese.service.ExportService;
 import com.ianctchinese.service.TextService;
@@ -57,6 +58,12 @@ public class TextController {
   public ResponseEntity<TextDocument> updateCategory(@PathVariable Long id,
       @Valid @RequestBody TextCategoryUpdateRequest request) {
     return ResponseEntity.ok(textService.updateCategory(id, request.getCategory()));
+  }
+
+  @PatchMapping("/{id}")
+  public ResponseEntity<TextDocument> updateText(@PathVariable Long id,
+      @Valid @RequestBody TextUpdateRequest request) {
+    return ResponseEntity.ok(textService.updateText(id, request));
   }
 
   @GetMapping("/{id}/export")

@@ -11,9 +11,7 @@ import com.ianctchinese.llm.dto.SentenceSuggestion;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,20 +27,16 @@ import org.springframework.web.client.RestTemplate;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class HuggingFaceClient {
+public class DeepSeekClient {
 
-  private static final String API_BASE = "https://api-inference.huggingface.co/models/";
+  private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
 
   private final RestTemplateBuilder restTemplateBuilder;
   private final ObjectMapper objectMapper;
-
   private RestTemplate restTemplate;
 
-  @Value("${huggingface.api-token:}")
-  private String apiToken;
-
-  @Value("${huggingface.model:Qwen/Qwen-0.6B}")
-  private String model;
+  @Value("${deepseek.api-key:}")
+  private String apiKey;
 
   private RestTemplate restTemplate() {
     if (restTemplate == null) {
@@ -77,18 +71,18 @@ public class HuggingFaceClient {
           .reasons(reasons)
           .build();
     } catch (Exception ex) {
-      log.warn("HuggingFace classifyText error: {}", ex.getMessage());
+      log.warn("DeepSeek classifyText error: {}", ex.getMessage());
       return defaultClassification();
     }
   }
 
   public AnnotationPayload annotateText(String textContent) {
     String systemPrompt = "你是一名古籍标注助手，需要同时完成实体抽取、关系抽取、句读建议及词频统计。"
-        + "实体类别仅使用下列之一：PERSON(人物)、LOCATION(地点)、EVENT(事件)、ORGANIZATION(组织/朝廷/部队)、OBJECT(器物/文献)、CUSTOM(其他)。"
-        + "关系类型仅使用以下值：FAMILY(亲属)、ALLY(结盟/支持)、RIVAL(对抗/敌对)、MENTOR(师承/同门)、INFLUENCE(影响/启发)、LOCATION_OF(所在)、PART_OF(隶属)、CAUSE(因果)、CUSTOM(其他)。"
-        + "请务必输出至少8-12个实体，至少5-8条关系（若文本确实无关系可空数组，但尽量挖掘人物/地点/事件之间的联系）。"
-        + "关系的 sourceLabel/targetLabel 必须出现在 entities 的 label 中。词频词云请输出8-12个简短词条（2-6字），weight 取 0.3-1。句读建议返回3-6条 original/punctuated/summary。"
-        + "JSON 必须闭合，如偏移难以确定，可用0-0占位。";
+        + "实体类别仅使用：PERSON(人物)、LOCATION(地点)、EVENT(事件)、ORGANIZATION(组织/朝廷/部队)、OBJECT(器物/文献)、CUSTOM(其他)。"
+        + "关系类型仅使用：FAMILY(亲属)、ALLY(结盟/支持)、RIVAL(对抗/敌对)、MENTOR(师承/同门)、INFLUENCE(影响/启发)、LOCATION_OF(所在)、PART_OF(隶属)、CAUSE(因果)、CUSTOM(其他)。"
+        + "要求：至少输出8-12个实体，并保证 label 可读；至少输出5-8条关系，覆盖人物/地点/事件间的联系，关系的 sourceLabel/targetLabel 必须存在于 entities.label。"
+        + "词云词条请输出8-12个短词（2-6字），weight 0.3-1，避免整句。句读建议提供3-6条 original/punctuated/summary。"
+        + "JSON 必须严格闭合。若偏移难以确定，可用0-0占位。";
     String userPrompt = """
         请只输出 JSON，格式如下：
         {
@@ -151,7 +145,7 @@ public class HuggingFaceClient {
           .wordCloud(wordCloudItems)
           .build();
     } catch (Exception ex) {
-      log.warn("HuggingFace annotateText error: {}", ex.getMessage());
+      log.warn("DeepSeek annotateText error: {}", ex.getMessage());
       return AnnotationPayload.builder().build();
     }
   }
@@ -164,30 +158,68 @@ public class HuggingFaceClient {
         .build();
   }
 
-  private JsonNode sendAndParse(String systemPrompt, String userPrompt) throws Exception {
-    String prompt = "System:\n" + systemPrompt + "\nUser:\n" + userPrompt;
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("inputs", prompt);
+  private record DeepSeekRequest(String model, List<Message> messages, double temperature,
+                                 int max_tokens) {
 
-    Map<String, Object> parameters = new HashMap<>();
-    parameters.put("temperature", 0.2);
-    parameters.put("max_new_tokens", 768);
-    payload.put("parameters", parameters);
-    payload.put("options", Map.of("wait_for_model", true));
+    static DeepSeekRequest of(String systemPrompt, String userPrompt) {
+      return new DeepSeekRequest(
+          "deepseek-chat",
+          List.of(
+              new Message("system", systemPrompt),
+              new Message("user", userPrompt)
+          ),
+          0.2,
+          2048
+      );
+    }
+  }
 
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
-    headers.setBearerAuth(Optional.ofNullable(apiToken).orElse(""));
+  private record Message(String role, String content) {
+  }
 
-    HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
-    ResponseEntity<String> response = restTemplate().postForEntity(API_BASE + model, entity, String.class);
+  private static class DeepSeekResponse {
 
-    if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-      log.warn("HuggingFace 无返回内容，status={}", response.getStatusCode());
-      return null;
+    private List<Choice> choices;
+
+    public List<Choice> getChoices() {
+      return choices;
     }
 
-    String content = response.getBody();
+    public void setChoices(List<Choice> choices) {
+      this.choices = choices;
+    }
+  }
+
+  private static class Choice {
+
+    private Message message;
+
+    public Message getMessage() {
+      return message;
+    }
+
+    public void setMessage(Message message) {
+      this.message = message;
+    }
+  }
+
+  private JsonNode sendAndParse(String systemPrompt, String userPrompt) throws Exception {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    headers.setBearerAuth(Optional.ofNullable(apiKey).orElse(""));
+
+    DeepSeekRequest request = DeepSeekRequest.of(systemPrompt, userPrompt);
+    HttpEntity<DeepSeekRequest> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<DeepSeekResponse> response = restTemplate()
+        .postForEntity(API_URL, entity, DeepSeekResponse.class);
+
+    if (response.getBody() == null
+        || response.getBody().getChoices() == null
+        || response.getBody().getChoices().isEmpty()) {
+      log.warn("DeepSeek 无返回内容，status={}", response.getStatusCode());
+      return null;
+    }
+    String content = response.getBody().getChoices().get(0).getMessage().content();
     return parseJson(content);
   }
 
@@ -195,7 +227,6 @@ public class HuggingFaceClient {
     if (content == null || content.isBlank()) {
       return null;
     }
-    // 尝试截取首尾花括号，防止模型返回解释文字
     int start = content.indexOf('{');
     int end = content.lastIndexOf('}');
     String json = (start >= 0 && end >= start) ? content.substring(start, end + 1) : content;
