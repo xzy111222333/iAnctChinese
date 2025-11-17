@@ -6,12 +6,15 @@
         <div v-if="store.selectedText?.content" class="text-content">
           <pre class="raw-text">{{ store.selectedText.content }}</pre>
         </div>
-        <p v-else class="placeholder">请先上传文言文或从左侧列表选择一篇。</p>
+        <p v-else class="placeholder">请先上传文言文或从左侧列表选择一篇文本</p>
         <el-divider />
         <div class="action-row">
+          <el-select v-model="selectedModel" size="small" style="width: 180px" placeholder="选择大模型">
+            <el-option label="HuggingFace (Qwen-0.6B)" value="huggingface" />
+            <el-option label="DeepSeek" value="deepseek" />
+          </el-select>
           <el-button type="primary" @click="handleFullAnalysis">触发模型分析</el-button>
           <el-button type="warning" plain @click="handleClassify">大模型判断类型</el-button>
-          <el-button @click="store.triggerAutoAnnotation">自动生成示例标注</el-button>
         </div>
         <div v-if="store.classification?.suggestedCategory" class="classification-tip">
           <el-alert title="模型分析建议" type="info" :closable="false" show-icon>
@@ -27,36 +30,36 @@
       </aside>
 
       <section class="panel annotation-panel">
-      <div class="annotation-section">
-        <h3 class="section-title">实体标注</h3>
-        <el-form :model="entityForm" inline class="form-inline">
-          <el-form-item label="名称">
-            <el-input v-model="entityForm.label" placeholder="如 周瑜" />
-          </el-form-item>
-          <el-form-item label="类别">
-            <el-select v-model="entityForm.category" placeholder="实体类别">
-              <el-option label="人物" value="PERSON" />
-              <el-option label="地点" value="LOCATION" />
-              <el-option label="事件" value="EVENT" />
-              <el-option label="组织" value="ORGANIZATION" />
-              <el-option label="器物" value="OBJECT" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="起止">
-            <el-input-number v-model="entityForm.startOffset" :min="0" />
-            <span> - </span>
-            <el-input-number v-model="entityForm.endOffset" :min="0" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="submitEntity">添加实体</el-button>
-          </el-form-item>
-        </el-form>
-        <el-table :data="entities" border size="small" height="220">
-          <el-table-column prop="label" label="实体" width="120" />
-          <el-table-column prop="category" label="类别" width="120" />
-          <el-table-column prop="confidence" label="置信度" />
-        </el-table>
-      </div>
+        <div class="annotation-section">
+          <h3 class="section-title">实体标注</h3>
+          <el-form :model="entityForm" inline class="form-inline">
+            <el-form-item label="名称">
+              <el-input v-model="entityForm.label" placeholder="例：周瑜" />
+            </el-form-item>
+            <el-form-item label="类别">
+              <el-select v-model="entityForm.category" placeholder="实体类别">
+                <el-option label="人物" value="PERSON" />
+                <el-option label="地点" value="LOCATION" />
+                <el-option label="事件" value="EVENT" />
+                <el-option label="组织" value="ORGANIZATION" />
+                <el-option label="器物" value="OBJECT" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="起止">
+              <el-input-number v-model="entityForm.startOffset" :min="0" />
+              <span> - </span>
+              <el-input-number v-model="entityForm.endOffset" :min="0" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="submitEntity">添加实体</el-button>
+            </el-form-item>
+          </el-form>
+          <el-table :data="entities" border size="small" height="220">
+            <el-table-column prop="label" label="实体" width="120" />
+            <el-table-column prop="category" label="类别" width="120" />
+            <el-table-column prop="confidence" label="置信度" />
+          </el-table>
+        </div>
         <el-divider />
         <div class="annotation-section">
           <h3 class="section-title">关系标注</h3>
@@ -96,56 +99,62 @@
           </el-form>
           <el-table :data="relations" border size="small" height="200">
             <el-table-column prop="source.label" label="实体A" />
-            <el-table-column prop="relationType" label="关系" width="140" />
+            <el-table-column prop="relationType" label="关系类型" />
             <el-table-column prop="target.label" label="实体B" />
+            <el-table-column prop="confidence" label="置信度" />
           </el-table>
         </div>
       </section>
-    </div>
 
-    <SentencePanel
-      :sections="sections"
-      @auto-segment="handleAutoSegment"
-      @update-section="handleUpdateSection"
-    />
+      <section class="panel sentence-panel">
+        <h3 class="section-title">句读/分段</h3>
+        <div class="section-actions">
+          <el-button size="small" @click="handleAutoSegment">自动推荐句读</el-button>
+        </div>
+        <div class="segments" v-if="sections.length">
+          <div v-for="section in sections" :key="section.id" class="segment-card">
+            <div class="segment-col">
+              <div class="segment-label">原文</div>
+              <div class="segment-text original">{{ section.originalText || "（空）" }}</div>
+            </div>
+            <div class="segment-col">
+              <div class="segment-label">句读</div>
+              <el-input
+                type="textarea"
+                v-model="section.punctuatedText"
+                :rows="3"
+                :autosize="{ minRows: 3, maxRows: 6 }"
+                placeholder="添加句读"
+                @blur="handleUpdateSection(section)"
+              />
+            </div>
+            <div class="segment-col">
+              <div class="segment-label">摘要</div>
+              <el-input
+                type="textarea"
+                v-model="section.summary"
+                :rows="3"
+                :autosize="{ minRows: 3, maxRows: 6 }"
+                placeholder="一句话摘要"
+                @blur="handleUpdateSection(section)"
+              />
+            </div>
+          </div>
+        </div>
+        <p v-else class="placeholder">暂无句读分段，请先自动推荐或手动新增。</p>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, watch, onMounted } from "vue";
-import { useRoute } from "vue-router";
-import { useTextStore } from "@/store/textStore";
+import { reactive, ref, computed } from "vue";
 import { ElMessage } from "element-plus";
-import SentencePanel from "@/components/visualizations/SentencePanel.vue";
+import { useTextStore } from "@/store/textStore";
 
-const route = useRoute();
 const store = useTextStore();
 
-const loadText = async (id) => {
-  if (!id) {
-    return;
-  }
-  try {
-    await store.selectText(id);
-  } catch (error) {
-    console.error("Failed to load text", error);
-  }
-};
-
-onMounted(async () => {
-  await loadText(route.params.id);
-});
-
-watch(
-  () => route.params.id,
-  async (id) => {
-    await loadText(id);
-  }
-);
-
-const entities = computed(() => store.entities);
-const relations = computed(() => store.relations);
-const sections = computed(() => store.sections);
+const selectedModel = ref("huggingface");
 
 const entityForm = reactive({
   label: "",
@@ -159,6 +168,10 @@ const relationForm = reactive({
   targetEntityId: null,
   relationType: "CONFLICT"
 });
+
+const sections = computed(() => store.sections || []);
+const entities = computed(() => store.entities || []);
+const relations = computed(() => store.relations || []);
 
 const submitEntity = async () => {
   if (!entityForm.label) {
@@ -208,7 +221,7 @@ const handleUpdateSection = async (section) => {
 
 const handleFullAnalysis = async () => {
   try {
-    await store.runFullAnalysis();
+    await store.runFullAnalysis(selectedModel.value);
     ElMessage.success("模型分析完成，已更新标注与句读");
   } catch (error) {
     ElMessage.error("模型分析失败，请稍后重试");
@@ -285,5 +298,51 @@ const translateCategory = (category) => {
 
 .form-inline :deep(.el-form-item) {
   margin-right: 12px;
+}
+
+.section-actions {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.segments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.segment-card {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.segment-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.segment-label {
+  font-weight: 600;
+  color: #8c7a6b;
+  font-size: 13px;
+}
+
+.segment-text {
+  background: #f9f7f2;
+  border: 1px solid #f1ede4;
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  color: #4a443e;
+  min-height: 88px;
+  white-space: pre-wrap;
 }
 </style>

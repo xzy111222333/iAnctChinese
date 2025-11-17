@@ -8,11 +8,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface TextDocumentRepository extends JpaRepository<TextDocument, Long> {
 
-  List<TextDocument> findByCategory(String category);
+  @Query("SELECT t FROM TextDocument t WHERE t.isDeleted = false OR t.isDeleted IS NULL")
+  List<TextDocument> findActive();
 
-  @Query("SELECT t FROM TextDocument t WHERE " +
+  @Query("SELECT t FROM TextDocument t WHERE (t.isDeleted = false OR t.isDeleted IS NULL) AND t.category = :category")
+  List<TextDocument> findActiveByCategory(@Param("category") String category);
+
+  @Query("SELECT t FROM TextDocument t WHERE (t.isDeleted = false OR t.isDeleted IS NULL) AND (" +
       "LOWER(t.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
       "LOWER(t.author) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-      "LOWER(t.content) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+      "LOWER(t.content) LIKE LOWER(CONCAT('%', :keyword, '%')))")
   List<TextDocument> searchByKeyword(@Param("keyword") String keyword);
 }

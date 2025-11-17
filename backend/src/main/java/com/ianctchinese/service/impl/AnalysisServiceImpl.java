@@ -11,6 +11,7 @@ import com.ianctchinese.dto.TextInsightsResponse.MapPathPoint;
 import com.ianctchinese.dto.TextInsightsResponse.Stats;
 import com.ianctchinese.dto.TextInsightsResponse.TimelineEvent;
 import com.ianctchinese.dto.TextInsightsResponse.WordCloudItem;
+import com.ianctchinese.llm.DeepSeekClient;
 import com.ianctchinese.llm.HuggingFaceClient;
 import com.ianctchinese.llm.dto.AnnotationPayload;
 import com.ianctchinese.llm.dto.AnnotationPayload.AnnotationEntity;
@@ -32,11 +33,16 @@ import com.ianctchinese.service.TextSectionService;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +55,7 @@ public class AnalysisServiceImpl implements AnalysisService {
       "warfare", "战争纪实",
       "travelogue", "游记地理",
       "biography", "人物传记",
+      "other", "其他",
       "unknown", "综合待识别"
   );
 
@@ -58,12 +65,13 @@ public class AnalysisServiceImpl implements AnalysisService {
   private final TextSectionRepository textSectionRepository;
   private final TextSectionService textSectionService;
   private final HuggingFaceClient huggingFaceClient;
+  private final DeepSeekClient deepSeekClient;
 
   @Override
   @Transactional
   public ClassificationResponse classifyText(Long textId) {
     TextDocument document = loadText(textId);
-    ClassificationPayload payload = huggingFaceClient.classifyText(document.getContent());
+    ClassificationPayload payload = classifyWithFallback(document.getContent(), false);
     String normalizedCategory = normalizeCategory(payload.getCategory(), document.getCategory());
     document.setCategory(normalizedCategory);
     textDocumentRepository.save(document);
@@ -117,11 +125,29 @@ public class AnalysisServiceImpl implements AnalysisService {
     relationAnnotationRepository.deleteByTextDocumentId(textId);
     entityAnnotationRepository.deleteByTextDocumentId(textId);
 
-    List<EntityAnnotation> entities = saveEntities(document, payload.getEntities());
-    List<RelationAnnotation> relations = saveRelations(document, payload.getRelations(), entities);
+    List<AnnotationEntity> fallbackEntities = buildHeuristicEntities(document.getContent());
+    List<AnnotationEntity> payloadEntities = payload.getEntities().isEmpty()
+        ? fallbackEntities
+        : payload.getEntities();
+
+    List<AnnotationEntity> payloadRelationsSource = payloadEntities.isEmpty()
+        ? fallbackEntities
+        : payloadEntities;
+
+    List<AnnotationRelation> payloadRelations = payload.getRelations().isEmpty()
+        ? buildHeuristicRelations(payloadRelationsSource)
+        : payload.getRelations();
+
+    List<EntityAnnotation> entities = saveEntities(document, payloadEntities);
+    List<RelationAnnotation> relations = saveRelations(document, payloadRelations, entities);
+    if (relations.isEmpty()) {
+      relations = saveHeuristicRelations(document, entities);
+    }
 
     if (!payload.getSentences().isEmpty()) {
       textSectionService.replaceSections(textId, toSegmentRequests(textId, payload.getSentences()));
+    } else {
+      textSectionService.autoSegment(textId);
     }
 
     return AutoAnnotationResponse.builder()
@@ -134,9 +160,54 @@ public class AnalysisServiceImpl implements AnalysisService {
 
   @Override
   @Transactional
-  public ModelAnalysisResponse runFullAnalysis(Long textId) {
-    ClassificationResponse classification = classifyText(textId);
-    AutoAnnotationResponse annotation = autoAnnotate(textId);
+  public ModelAnalysisResponse runFullAnalysis(Long textId, String provider) {
+    boolean useDeepSeek = provider != null && provider.equalsIgnoreCase("deepseek");
+
+    TextDocument document = loadText(textId);
+    ClassificationPayload clsPayload = classifyWithFallback(document.getContent(), useDeepSeek);
+    String normalizedCategory = normalizeCategory(clsPayload.getCategory(), document.getCategory());
+    document.setCategory(normalizedCategory);
+    textDocumentRepository.save(document);
+
+    AnnotationPayload annPayload = useDeepSeek
+        ? deepSeekClient.annotateText(document.getContent())
+        : huggingFaceClient.annotateText(document.getContent());
+    relationAnnotationRepository.deleteByTextDocumentId(textId);
+    entityAnnotationRepository.deleteByTextDocumentId(textId);
+
+    List<AnnotationEntity> payloadEntities = annPayload.getEntities().isEmpty()
+        ? buildHeuristicEntities(document.getContent())
+        : annPayload.getEntities();
+    List<AnnotationRelation> payloadRelations = annPayload.getRelations().isEmpty()
+        ? buildHeuristicRelations(payloadEntities)
+        : annPayload.getRelations();
+
+    List<EntityAnnotation> entities = saveEntities(document, payloadEntities);
+    List<RelationAnnotation> relations = saveRelations(document, payloadRelations, entities);
+    if (relations.isEmpty()) {
+      relations = saveHeuristicRelations(document, entities);
+    }
+
+    if (!annPayload.getSentences().isEmpty()) {
+      textSectionService.replaceSections(textId, toSegmentRequests(textId, annPayload.getSentences()));
+    } else {
+      textSectionService.autoSegment(textId);
+    }
+
+    ClassificationResponse classification = ClassificationResponse.builder()
+        .textId(textId)
+        .suggestedCategory(normalizedCategory)
+        .confidence(clsPayload.getConfidence())
+        .reasons(clsPayload.getReasons())
+        .build();
+
+    AutoAnnotationResponse annotation = AutoAnnotationResponse.builder()
+        .textId(textId)
+        .createdEntities(entities.size())
+        .createdRelations(relations.size())
+        .message("模型已生成实体、关系与句读，可在前端继续校对。")
+        .build();
+
     TextInsightsResponse insights = buildInsights(textId);
     List<TextSection> sections = textSectionRepository.findByTextDocumentId(textId);
     return ModelAnalysisResponse.builder()
@@ -201,9 +272,113 @@ public class AnalysisServiceImpl implements AnalysisService {
     return relationAnnotationRepository.saveAll(relations);
   }
 
+  private List<RelationAnnotation> saveHeuristicRelations(TextDocument document,
+      List<EntityAnnotation> entities) {
+    List<RelationAnnotation> relations = new ArrayList<>();
+    if (entities == null || entities.size() < 2) {
+      return relations;
+    }
+    for (int i = 0; i < entities.size() - 1 && relations.size() < 8; i++) {
+      EntityAnnotation a = entities.get(i);
+      EntityAnnotation b = entities.get(i + 1);
+      relations.add(RelationAnnotation.builder()
+          .textDocument(document)
+          .source(a)
+          .target(b)
+          .relationType(RelationType.CUSTOM)
+          .confidence(0.4)
+          .evidence("相邻共现推断")
+          .build());
+    }
+    return relationAnnotationRepository.saveAll(relations);
+  }
+
+  private List<AnnotationRelation> buildHeuristicRelations(List<AnnotationEntity> entities) {
+    List<AnnotationRelation> relations = new ArrayList<>();
+    if (entities == null || entities.size() < 2) {
+      return relations;
+    }
+    for (int i = 0; i < entities.size() - 1 && relations.size() < 8; i++) {
+      AnnotationEntity a = entities.get(i);
+      AnnotationEntity b = entities.get(i + 1);
+      relations.add(AnnotationRelation.builder()
+          .sourceLabel(a.getLabel())
+          .targetLabel(b.getLabel())
+          .relationType("CUSTOM")
+          .confidence(0.5)
+          .description("相邻共现")
+          .build());
+    }
+    return relations;
+  }
+
   private TextDocument loadText(Long textId) {
     return textDocumentRepository.findById(textId)
         .orElseThrow(() -> new IllegalArgumentException("Text not found: " + textId));
+  }
+
+  /**
+   * 调用大模型分类；如返回为空或“unknown”，使用关键词启发式兜底，至少给出一个可用类别。
+   */
+  private ClassificationPayload classifyWithFallback(String content, boolean useDeepSeek) {
+    ClassificationPayload payload = null;
+    try {
+      payload = useDeepSeek
+          ? deepSeekClient.classifyText(content)
+          : huggingFaceClient.classifyText(content);
+    } catch (Exception ex) {
+      // ignore, fallback below
+    }
+
+    boolean invalid = payload == null
+        || payload.getCategory() == null
+        || payload.getCategory().isBlank()
+        || "unknown".equalsIgnoreCase(payload.getCategory());
+
+    if (!invalid) {
+      return payload;
+    }
+
+    return heuristicClassify(content);
+  }
+
+  /**
+   * 简单关键词统计，用于无网络/模型失败时的本地兜底分类。
+   */
+  private ClassificationPayload heuristicClassify(String content) {
+    if (content == null) {
+      content = "";
+    }
+    Map<String, Integer> scores = new HashMap<>();
+    scores.put("warfare", countKeywords(content, List.of("战", "兵", "攻", "军", "将", "敌", "阵", "戎")));
+    scores.put("travelogue", countKeywords(content, List.of("山", "水", "江", "河", "湖", "舟", "行", "游", "路", "岭", "津")));
+    scores.put("biography", countKeywords(content, List.of("生", "卒", "字", "号", "君", "父", "母", "兄", "子", "仕", "官", "谥", "年")));
+
+    Entry<String, Integer> best = scores.entrySet().stream()
+        .max(Map.Entry.comparingByValue())
+        .orElse(Map.entry("unknown", 0));
+
+    String category = best.getValue() > 0 ? best.getKey() : "unknown";
+    double confidence = Math.min(0.9, 0.55 + best.getValue() * 0.05);
+    List<String> reasons = List.of("本地关键词推断：" + CATEGORY_LABELS.getOrDefault(category, "待识别"));
+
+    return ClassificationPayload.builder()
+        .category(category)
+        .confidence(confidence)
+        .reasons(reasons)
+        .build();
+  }
+
+  private int countKeywords(String content, List<String> keywords) {
+    int score = 0;
+    for (String keyword : keywords) {
+      int idx = content.indexOf(keyword);
+      while (idx >= 0) {
+        score++;
+        idx = content.indexOf(keyword, idx + keyword.length());
+      }
+    }
+    return score;
   }
 
   private String normalizeCategory(String category, String fallback) {
@@ -212,8 +387,9 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
     String normalized = category.toLowerCase(Locale.ROOT);
     return switch (normalized) {
-      case "warfare", "travelogue", "biography" -> normalized;
-      default -> Optional.ofNullable(fallback).orElse("unknown");
+      case "warfare", "travelogue", "biography", "other" -> normalized;
+      case "unknown" -> Optional.ofNullable(fallback).orElse("other");
+      default -> Optional.ofNullable(fallback).orElse("other");
     };
   }
 
@@ -398,5 +574,30 @@ public class AnalysisServiceImpl implements AnalysisService {
         stats.getEntityCount(),
         stats.getRelationCount(),
         String.join(" / ", buildRecommendedViews(text.getCategory())));
+  }
+
+  private List<AnnotationEntity> buildHeuristicEntities(String content) {
+    if (content == null || content.isBlank()) {
+      return Collections.emptyList();
+    }
+    Pattern pattern = Pattern.compile("[\\u4e00-\\u9fa5]{2,3}");
+    Matcher matcher = pattern.matcher(content);
+    Set<String> labels = new LinkedHashSet<>();
+    while (matcher.find() && labels.size() < 12) {
+      String token = matcher.group();
+      if (token.length() >= 2) {
+        labels.add(token);
+      }
+    }
+    return labels.stream()
+        .limit(12)
+        .map(label -> AnnotationEntity.builder()
+            .label(label)
+            .category("PERSON")
+            .startOffset(0)
+            .endOffset(0)
+            .confidence(0.5)
+            .build())
+        .collect(Collectors.toList());
   }
 }

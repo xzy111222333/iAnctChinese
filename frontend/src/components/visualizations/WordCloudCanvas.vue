@@ -25,7 +25,7 @@ const drawCloud = () => {
 
   const rect = canvas.parentElement.getBoundingClientRect();
   canvas.width = rect.width;
-  canvas.height = rect.height || 220;
+  canvas.height = rect.height || 320;
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -42,7 +42,8 @@ const drawCloud = () => {
   const maxWeight = Math.max(...words.map((w) => w.weight || 1));
   const sizeScale = (w) => {
     const normalized = (w - minWeight) / (maxWeight - minWeight || 1);
-    return 16 + normalized * 36; // font size range 16-52
+    const boosted = Math.pow(Math.max(0, Math.min(1, normalized)), 0.6);
+    return 26 + boosted * 100; // font size range 26-96，更突出高频词
   };
 
   const placed = [];
@@ -127,7 +128,7 @@ watch(
 <style scoped>
 .cloud-wrap {
   width: 100%;
-  height: 260px;
+  height: 360px;
 }
 
 canvas {

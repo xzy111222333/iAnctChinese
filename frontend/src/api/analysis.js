@@ -12,6 +12,8 @@ export const fetchInsights = (textId) => {
   return apiClient.get(`/analysis/${textId}/insights`);
 };
 
-export const runFullAnalysis = (textId) => {
-  return apiClient.post(`/analysis/${textId}/full`);
+export const runFullAnalysis = (textId, model) => {
+  return apiClient.post(`/analysis/${textId}/full`, null, {
+    params: model ? { model } : {}
+  });
 };

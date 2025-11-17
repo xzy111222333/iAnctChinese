@@ -58,7 +58,7 @@
         <el-table-column label="操作" width="360">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="openDocument(row)">进入文档</el-button>
-            <el-button size="small" type="success" plain @click="openDashboard(row)">分析工作台</el-button>
+            <el-button size="small" type="success" plain @click="openEditDialog(row)">分析工作台</el-button>
             <el-popconfirm
               title="删除后不可恢复，确认删除该文档？"
               confirm-button-text="删除"
@@ -73,6 +73,27 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <el-dialog v-model="editDialogVisible" title="编辑文档" width="640px">
+      <el-form :model="editForm" label-width="72px">
+        <el-form-item label="标题">
+          <el-input v-model="editForm.title" placeholder="如 《赤壁赋》" />
+        </el-form-item>
+        <el-form-item label="作者">
+          <el-input v-model="editForm.author" placeholder="作者/编者" />
+        </el-form-item>
+        <el-form-item label="时代">
+          <el-input v-model="editForm.era" placeholder="如 宋" />
+        </el-form-item>
+        <el-form-item label="正文">
+          <el-input v-model="editForm.content" type="textarea" :rows="8" placeholder="粘贴完整文言文内容..." />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveEdit">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -88,6 +109,14 @@ import AuthToolbar from "@/components/layout/AuthToolbar.vue";
 const router = useRouter();
 const store = useTextStore();
 const keyword = ref("");
+const editDialogVisible = ref(false);
+const editForm = ref({
+  id: null,
+  title: "",
+  author: "",
+  era: "",
+  content: ""
+});
 
 onMounted(async () => {
   if (!store.texts.length) {
@@ -132,7 +161,6 @@ const openDocument = async (text) => {
     return;
   }
   try {
-    // 预先设置选中文档以便界面立即有数据，真正数据加载由 TextWorkspace 完成
     store.selectedTextId = text.id;
     store.selectedText = text;
     router.push({ name: "text-workspace", params: { id: text.id } });
@@ -142,17 +170,16 @@ const openDocument = async (text) => {
   }
 };
 
-const openDashboard = async (text) => {
-  if (!text?.id) {
-    return;
-  }
-  try {
-    await store.selectText(text.id);
-    router.push({ name: "dashboard" });
-  } catch (error) {
-    console.error("Failed to open dashboard:", error);
-    ElMessage.error("加载文档失败");
-  }
+const openEditDialog = (text) => {
+  if (!text?.id) return;
+  editForm.value = {
+    id: text.id,
+    title: text.title || "",
+    author: text.author || "",
+    era: text.era || "",
+    content: text.content || ""
+  };
+  editDialogVisible.value = true;
 };
 
 const handleDelete = async (text) => {
@@ -165,6 +192,26 @@ const handleDelete = async (text) => {
   } catch (error) {
     console.error("Failed to delete text:", error);
     ElMessage.error("删除失败，请稍后再试");
+  }
+};
+
+const handleSaveEdit = async () => {
+  if (!editForm.value.id) {
+    return;
+  }
+  try {
+    await store.updateText(editForm.value.id, {
+      title: editForm.value.title,
+      author: editForm.value.author,
+      era: editForm.value.era,
+      content: editForm.value.content,
+      category: editForm.value.category
+    });
+    ElMessage.success("文档已保存");
+    editDialogVisible.value = false;
+  } catch (error) {
+    console.error("Failed to save text:", error);
+    ElMessage.error("保存失败，请稍后再试");
   }
 };
 </script>
@@ -247,5 +294,4 @@ const handleDelete = async (text) => {
   color: #9ca3af;
   font-weight: 400;
 }
-
 </style>
