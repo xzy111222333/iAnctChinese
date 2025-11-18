@@ -38,7 +38,7 @@ const routes = [
   {
     path: "/texts/:id",
     name: "text-workspace",
-    component: DashboardView,
+    component: TextWorkspace,
     props: true,
     meta: { requiresAuth: true }
   }
@@ -56,13 +56,10 @@ router.beforeEach(async (to, from, next) => {
     await authStore.loadUser();
   }
 
-  const isAuthPage = to.name === "login" || to.name === "register";
-  const isLanding = to.name === "home";
-
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next("/login");
-  } else if (authStore.isAuthenticated && (isAuthPage || isLanding)) {
-    next("/documents");
+  } else if (authStore.isAuthenticated && (to.name === "login" || to.name === "register")) {
+    next("/dashboard");
   } else {
     next();
   }

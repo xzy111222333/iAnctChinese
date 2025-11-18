@@ -2,11 +2,20 @@
   <div class="workspace" v-loading="store.loading">
     <div class="stage-grid">
       <aside class="panel text-panel">
-        <h3 class="section-title">原文</h3>
-        <div v-if="store.selectedText?.content" class="text-content">
-          <pre class="raw-text">{{ store.selectedText.content }}</pre>
+        <div class="panel-head">
+          <h3 class="section-title">原文</h3>
+          <el-button link @click="goBackToDocuments">返回文档管理</el-button>
         </div>
-        <p v-else class="placeholder">请先上传文言文或从左侧列表选择一篇文本</p>
+        <QuillEditor
+          v-if="store.selectedText"
+          v-model:content="editableContent"
+          class="text-editor"
+          theme="snow"
+          content-type="text"
+          :read-only="savingContent"
+          @blur="handleContentSave()"
+        />
+        <p v-else class="placeholder">请先上传文言文或从左侧列表选择一篇文章</p>
         <el-divider />
         <div class="action-row">
           <el-select v-model="selectedModel" size="small" style="width: 180px" placeholder="选择大模型">
@@ -14,6 +23,9 @@
             <el-option label="DeepSeek" value="deepseek" />
           </el-select>
           <el-button type="primary" @click="handleFullAnalysis">触发模型分析</el-button>
+          <el-button type="success" plain :loading="savingContent" @click="handleContentSave(true)">
+            保存原文
+          </el-button>
           <el-button type="warning" plain @click="handleClassify">大模型判断类型</el-button>
         </div>
         <div v-if="store.classification?.suggestedCategory" class="classification-tip">
@@ -68,9 +80,9 @@
               <el-select v-model="relationForm.sourceEntityId" placeholder="选择实体">
                 <el-option
                   v-for="entity in entities"
+                  :key="entity.id"
                   :label="entity.label"
                   :value="entity.id"
-                  :key="entity.id"
                 />
               </el-select>
             </el-form-item>
@@ -78,9 +90,9 @@
               <el-select v-model="relationForm.targetEntityId" placeholder="选择实体">
                 <el-option
                   v-for="entity in entities"
+                  :key="`target-${entity.id}`"
                   :label="entity.label"
                   :value="entity.id"
-                  :key="`target-${entity.id}`"
                 />
               </el-select>
             </el-form-item>
@@ -122,7 +134,6 @@
               <el-input
                 type="textarea"
                 v-model="section.punctuatedText"
-                :rows="3"
                 :autosize="{ minRows: 3, maxRows: 6 }"
                 placeholder="添加句读"
                 @blur="handleUpdateSection(section)"
@@ -133,7 +144,6 @@
               <el-input
                 type="textarea"
                 v-model="section.summary"
-                :rows="3"
                 :autosize="{ minRows: 3, maxRows: 6 }"
                 placeholder="一句话摘要"
                 @blur="handleUpdateSection(section)"
@@ -148,13 +158,19 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from "vue";
+import { reactive, ref, computed, watch } from "vue";
+import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { useTextStore } from "@/store/textStore";
+import { QuillEditor } from "@vueup/vue-quill";
+import "@vueup/vue-quill/dist/vue-quill.snow.css";
 
+const router = useRouter();
 const store = useTextStore();
 
 const selectedModel = ref("huggingface");
+const editableContent = ref("");
+const savingContent = ref(false);
 
 const entityForm = reactive({
   label: "",
@@ -172,6 +188,44 @@ const relationForm = reactive({
 const sections = computed(() => store.sections || []);
 const entities = computed(() => store.entities || []);
 const relations = computed(() => store.relations || []);
+
+watch(
+  () => store.selectedText?.content,
+  (value) => {
+    editableContent.value = value || "";
+  },
+  { immediate: true }
+);
+
+const handleContentSave = async (force = false) => {
+  if (!store.selectedTextId || !store.selectedText) {
+    return;
+  }
+  if (!force && (savingContent.value || editableContent.value === store.selectedText.content)) {
+    return;
+  }
+  savingContent.value = true;
+  try {
+    const payload = {
+      title: store.selectedText.title || "未命名文献",
+      content: editableContent.value,
+      category: store.selectedText.category || "unknown",
+      author: store.selectedText.author || "",
+      era: store.selectedText.era || ""
+    };
+    const updated = await store.updateText(store.selectedTextId, payload);
+    store.selectedText.content = updated.content;
+    ElMessage.success("原文内容已保存");
+  } catch (error) {
+    ElMessage.error("原文保存失败，请稍后重试");
+  } finally {
+    savingContent.value = false;
+  }
+};
+
+const goBackToDocuments = () => {
+  router.push("/documents");
+};
 
 const submitEntity = async () => {
   if (!entityForm.label) {
@@ -262,19 +316,11 @@ const translateCategory = (category) => {
   gap: 16px;
 }
 
-.text-content {
-  max-height: 320px;
-  overflow: auto;
-  line-height: 1.8;
-  padding-right: 8px;
-  color: var(--muted);
-}
-
-.raw-text {
-  white-space: pre-line;
-  margin: 0;
-  font-size: 15px;
-  color: #4a443e;
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .placeholder {
@@ -290,6 +336,23 @@ const translateCategory = (category) => {
 
 .classification-tip {
   margin-top: 12px;
+}
+
+.text-editor :deep(.ql-container) {
+  border-radius: 12px;
+  border: 1px solid #e4e7ed;
+  min-height: 320px;
+}
+
+.text-editor :deep(.ql-editor) {
+  min-height: 280px;
+  line-height: 1.8;
+  font-size: 15px;
+  color: #4a443e;
+}
+
+.text-editor :deep(.ql-toolbar) {
+  border-radius: 12px 12px 0 0;
 }
 
 .annotation-section {
