@@ -11,8 +11,7 @@ import com.ianctchinese.dto.TextInsightsResponse.MapPathPoint;
 import com.ianctchinese.dto.TextInsightsResponse.Stats;
 import com.ianctchinese.dto.TextInsightsResponse.TimelineEvent;
 import com.ianctchinese.dto.TextInsightsResponse.WordCloudItem;
-import com.ianctchinese.llm.DeepSeekClient;
-import com.ianctchinese.llm.HuggingFaceClient;
+import com.ianctchinese.llm.SiliconFlowClient;
 import com.ianctchinese.llm.dto.AnnotationPayload;
 import com.ianctchinese.llm.dto.AnnotationPayload.AnnotationEntity;
 import com.ianctchinese.llm.dto.AnnotationPayload.AnnotationRelation;
@@ -64,14 +63,13 @@ public class AnalysisServiceImpl implements AnalysisService {
   private final RelationAnnotationRepository relationAnnotationRepository;
   private final TextSectionRepository textSectionRepository;
   private final TextSectionService textSectionService;
-  private final HuggingFaceClient huggingFaceClient;
-  private final DeepSeekClient deepSeekClient;
+  private final SiliconFlowClient siliconFlowClient;
 
   @Override
   @Transactional
-  public ClassificationResponse classifyText(Long textId) {
+  public ClassificationResponse classifyText(Long textId, String model) {
     TextDocument document = loadText(textId);
-    ClassificationPayload payload = classifyWithFallback(document.getContent(), false);
+    ClassificationPayload payload = classifyWithFallback(document.getContent(), model);
     String normalizedCategory = normalizeCategory(payload.getCategory(), document.getCategory());
     document.setCategory(normalizedCategory);
     textDocumentRepository.save(document);
@@ -121,7 +119,7 @@ public class AnalysisServiceImpl implements AnalysisService {
   @Transactional
   public AutoAnnotationResponse autoAnnotate(Long textId) {
     TextDocument document = loadText(textId);
-    AnnotationPayload payload = huggingFaceClient.annotateText(document.getContent());
+    AnnotationPayload payload = siliconFlowClient.annotateText(document.getContent(), null);
     relationAnnotationRepository.deleteByTextDocumentId(textId);
     entityAnnotationRepository.deleteByTextDocumentId(textId);
 
@@ -160,18 +158,14 @@ public class AnalysisServiceImpl implements AnalysisService {
 
   @Override
   @Transactional
-  public ModelAnalysisResponse runFullAnalysis(Long textId, String provider) {
-    boolean useDeepSeek = provider != null && provider.equalsIgnoreCase("deepseek");
-
+  public ModelAnalysisResponse runFullAnalysis(Long textId, String model) {
     TextDocument document = loadText(textId);
-    ClassificationPayload clsPayload = classifyWithFallback(document.getContent(), useDeepSeek);
+    ClassificationPayload clsPayload = classifyWithFallback(document.getContent(), model);
     String normalizedCategory = normalizeCategory(clsPayload.getCategory(), document.getCategory());
     document.setCategory(normalizedCategory);
     textDocumentRepository.save(document);
 
-    AnnotationPayload annPayload = useDeepSeek
-        ? deepSeekClient.annotateText(document.getContent())
-        : huggingFaceClient.annotateText(document.getContent());
+    AnnotationPayload annPayload = siliconFlowClient.annotateText(document.getContent(), model);
     relationAnnotationRepository.deleteByTextDocumentId(textId);
     entityAnnotationRepository.deleteByTextDocumentId(textId);
 
@@ -320,14 +314,11 @@ public class AnalysisServiceImpl implements AnalysisService {
   /**
    * 调用大模型分类；如返回为空或“unknown”，使用关键词启发式兜底，至少给出一个可用类别。
    */
-  private ClassificationPayload classifyWithFallback(String content, boolean useDeepSeek) {
+  private ClassificationPayload classifyWithFallback(String content, String model) {
     ClassificationPayload payload = null;
     try {
-      payload = useDeepSeek
-          ? deepSeekClient.classifyText(content)
-          : huggingFaceClient.classifyText(content);
+      payload = siliconFlowClient.classifyText(content, model);
     } catch (Exception ex) {
-      // ignore, fallback below
     }
 
     boolean invalid = payload == null

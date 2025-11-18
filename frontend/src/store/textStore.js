@@ -23,6 +23,8 @@ export const useTextStore = defineStore("textStore", {
     exporting: false,
     loading: false,
     saving: false,
+    analysisRunning: false,
+    classifyRunning: false,
     filters: {
       entityCategories: [],
       relationTypes: [],
@@ -132,13 +134,13 @@ export const useTextStore = defineStore("textStore", {
       await createRelation(payload);
       await this.selectText(payload.textId);
     },
-    async classifySelectedText() {
+    async classifySelectedText(model) {
       if (!this.selectedTextId) {
         return;
       }
-      this.loading = true;
+      this.classifyRunning = true;
       try {
-        const { data } = await classifyText(this.selectedTextId);
+        const { data } = await classifyText(this.selectedTextId, model);
         this.classification = data;
         if (data?.suggestedCategory) {
           if (this.selectedText) {
@@ -151,7 +153,7 @@ export const useTextStore = defineStore("textStore", {
           await this.loadNavigationTree();
         }
       } finally {
-        this.loading = false;
+        this.classifyRunning = false;
       }
     },
     async triggerAutoAnnotation() {
@@ -165,7 +167,7 @@ export const useTextStore = defineStore("textStore", {
       if (!this.selectedTextId) {
         return;
       }
-      this.loading = true;
+      this.analysisRunning = true;
       try {
         const { data } = await runFullAnalysisApi(this.selectedTextId, model);
         this.classification = data.classification;
@@ -194,7 +196,7 @@ export const useTextStore = defineStore("textStore", {
         // 导航树受分类变更影响，重新加载
         await this.loadNavigationTree();
       } finally {
-        this.loading = false;
+        this.analysisRunning = false;
       }
     },
     async updateSelectedCategory(category) {

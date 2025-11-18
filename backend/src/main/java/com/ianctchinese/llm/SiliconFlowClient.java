@@ -27,16 +27,19 @@ import org.springframework.web.client.RestTemplate;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class DeepSeekClient {
+public class SiliconFlowClient {
 
-  private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
+  private static final String API_URL = "https://api.siliconflow.cn/v1/chat/completions";
 
   private final RestTemplateBuilder restTemplateBuilder;
   private final ObjectMapper objectMapper;
   private RestTemplate restTemplate;
 
-  @Value("${deepseek.api-key:}")
+  @Value("${siliconflow.api-key:}")
   private String apiKey;
+
+  @Value("${siliconflow.default-model:deepseek-ai/DeepSeek-V3}")
+  private String defaultModel;
 
   private RestTemplate restTemplate() {
     if (restTemplate == null) {
@@ -48,7 +51,7 @@ public class DeepSeekClient {
     return restTemplate;
   }
 
-  public ClassificationPayload classifyText(String textContent) {
+  public ClassificationPayload classifyText(String textContent, String modelName) {
     String systemPrompt = "你是一名古汉语文本分类助手，需要根据输入文本判断其属于战争纪实（warfare）、游记地理（travelogue）、人物传记（biography）或其他类型（other）。";
     String userPrompt = """
         请只输出 JSON，格式如下：
@@ -57,7 +60,7 @@ public class DeepSeekClient {
         %s
         """.formatted(textContent);
     try {
-      JsonNode node = sendAndParse(systemPrompt, userPrompt);
+      JsonNode node = sendAndParse(systemPrompt, userPrompt, modelName);
       if (node == null) {
         return defaultClassification();
       }
@@ -71,12 +74,12 @@ public class DeepSeekClient {
           .reasons(reasons)
           .build();
     } catch (Exception ex) {
-      log.warn("DeepSeek classifyText error: {}", ex.getMessage());
+      log.warn("SiliconFlow classifyText error: {}", ex.getMessage());
       return defaultClassification();
     }
   }
 
-  public AnnotationPayload annotateText(String textContent) {
+  public AnnotationPayload annotateText(String textContent, String modelName) {
     String systemPrompt = "你是一名古籍标注助手，需要同时完成实体抽取、关系抽取、句读建议及词频统计。"
         + "实体类别仅使用：PERSON(人物)、LOCATION(地点)、EVENT(事件)、ORGANIZATION(组织/朝廷/部队)、OBJECT(器物/文献)、CUSTOM(其他)。"
         + "关系类型仅使用：FAMILY(亲属)、ALLY(结盟/支持)、RIVAL(对抗/敌对)、MENTOR(师承/同门)、INFLUENCE(影响/启发)、LOCATION_OF(所在)、PART_OF(隶属)、CAUSE(因果)、CUSTOM(其他)。"
@@ -95,7 +98,7 @@ public class DeepSeekClient {
         %s
         """.formatted(textContent);
     try {
-      JsonNode node = sendAndParse(systemPrompt, userPrompt);
+      JsonNode node = sendAndParse(systemPrompt, userPrompt, modelName);
       if (node == null) {
         return AnnotationPayload.builder().build();
       }
@@ -145,7 +148,7 @@ public class DeepSeekClient {
           .wordCloud(wordCloudItems)
           .build();
     } catch (Exception ex) {
-      log.warn("DeepSeek annotateText error: {}", ex.getMessage());
+      log.warn("SiliconFlow annotateText error: {}", ex.getMessage());
       return AnnotationPayload.builder().build();
     }
   }
@@ -158,12 +161,17 @@ public class DeepSeekClient {
         .build();
   }
 
-  private record DeepSeekRequest(String model, List<Message> messages, double temperature,
-                                 int max_tokens) {
+  private record ChatCompletionRequest(String model, List<Message> messages, double temperature,
+                                       int max_tokens) {
 
-    static DeepSeekRequest of(String systemPrompt, String userPrompt) {
-      return new DeepSeekRequest(
-          "deepseek-chat",
+    static ChatCompletionRequest of(String systemPrompt, String userPrompt, String modelName,
+        String defaultModel) {
+      String resolvedModel = Optional.ofNullable(modelName)
+          .filter(name -> !name.isBlank())
+          .orElse(Optional.ofNullable(defaultModel).filter(name -> !name.isBlank())
+              .orElse("deepseek-ai/DeepSeek-V3"));
+      return new ChatCompletionRequest(
+          resolvedModel,
           List.of(
               new Message("system", systemPrompt),
               new Message("user", userPrompt)
@@ -177,7 +185,7 @@ public class DeepSeekClient {
   private record Message(String role, String content) {
   }
 
-  private static class DeepSeekResponse {
+  private static class ChatCompletionResponse {
 
     private List<Choice> choices;
 
@@ -203,20 +211,22 @@ public class DeepSeekClient {
     }
   }
 
-  private JsonNode sendAndParse(String systemPrompt, String userPrompt) throws Exception {
+  private JsonNode sendAndParse(String systemPrompt, String userPrompt, String modelName)
+      throws Exception {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setBearerAuth(Optional.ofNullable(apiKey).orElse(""));
 
-    DeepSeekRequest request = DeepSeekRequest.of(systemPrompt, userPrompt);
-    HttpEntity<DeepSeekRequest> entity = new HttpEntity<>(request, headers);
-    ResponseEntity<DeepSeekResponse> response = restTemplate()
-        .postForEntity(API_URL, entity, DeepSeekResponse.class);
+    ChatCompletionRequest request = ChatCompletionRequest.of(systemPrompt, userPrompt, modelName,
+        defaultModel);
+    HttpEntity<ChatCompletionRequest> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<ChatCompletionResponse> response = restTemplate()
+        .postForEntity(API_URL, entity, ChatCompletionResponse.class);
 
     if (response.getBody() == null
         || response.getBody().getChoices() == null
         || response.getBody().getChoices().isEmpty()) {
-      log.warn("DeepSeek 无返回内容，status={}", response.getStatusCode());
+      log.warn("SiliconFlow 无返回内容，status={}", response.getStatusCode());
       return null;
     }
     String content = response.getBody().getChoices().get(0).getMessage().content();
@@ -233,3 +243,4 @@ public class DeepSeekClient {
     return objectMapper.readTree(json);
   }
 }
+

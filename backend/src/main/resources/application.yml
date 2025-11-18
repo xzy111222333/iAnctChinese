@@ -33,10 +33,9 @@ logging:
     org.springframework.web: INFO
 
 # backend/src/main/resources/application.yml
-huggingface:
-  api-token: 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
-  model: qwen/Qwen3-0.6B
-deepseek:
-  api-key: ${DEEPSEEK_API_KEY:}
+
+siliconflow:
+  api-key: sk-rozyqiofobetxzpozmiqfxnwemhvpxvotndkbugnrkaurcwj
+  default-model: deepseek-ai/DeepSeek-V3
 
 

@@ -1,7 +1,9 @@
 import apiClient from "./client";
 
-export const classifyText = (textId) => {
-  return apiClient.post(`/analysis/${textId}/classify`);
+export const classifyText = (textId, model) => {
+  return apiClient.post(`/analysis/${textId}/classify`, null, {
+    params: model ? { model } : {}
+  });
 };
 
 export const autoAnnotate = (textId) => {

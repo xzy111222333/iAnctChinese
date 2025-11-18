@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,8 +22,9 @@ public class TextAnalysisController {
   private final AnalysisService analysisService;
 
   @PostMapping("/{textId}/classify")
-  public ResponseEntity<ClassificationResponse> classify(@PathVariable("textId") Long textId) {
-    return ResponseEntity.ok(analysisService.classifyText(textId));
+  public ResponseEntity<ClassificationResponse> classify(@PathVariable("textId") Long textId,
+      @RequestParam(value = "model", required = false) String model) {
+    return ResponseEntity.ok(analysisService.classifyText(textId, model));
   }
 
   @PostMapping("/{textId}/auto-annotate")
@@ -32,9 +34,8 @@ public class TextAnalysisController {
 
   @PostMapping("/{textId}/full")
   public ResponseEntity<ModelAnalysisResponse> fullAnalysis(@PathVariable("textId") Long textId,
-      @org.springframework.web.bind.annotation.RequestParam(value = "model", required = false)
-      String provider) {
-    return ResponseEntity.ok(analysisService.runFullAnalysis(textId, provider));
+      @RequestParam(value = "model", required = false) String model) {
+    return ResponseEntity.ok(analysisService.runFullAnalysis(textId, model));
   }
 
   @GetMapping("/{textId}/insights")

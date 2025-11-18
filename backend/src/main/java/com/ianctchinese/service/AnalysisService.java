@@ -7,11 +7,11 @@ import com.ianctchinese.dto.TextInsightsResponse;
 
 public interface AnalysisService {
 
-  ClassificationResponse classifyText(Long textId);
+  ClassificationResponse classifyText(Long textId, String model);
 
   TextInsightsResponse buildInsights(Long textId);
 
   AutoAnnotationResponse autoAnnotate(Long textId);
 
-  ModelAnalysisResponse runFullAnalysis(Long textId, String provider);
+  ModelAnalysisResponse runFullAnalysis(Long textId, String model);
 }
