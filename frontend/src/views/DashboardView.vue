@@ -228,24 +228,20 @@ const insights = computed(() => store.insights);
 const viewPresets = {
   travelogue: [
     { value: "map", label: "地图轨迹" },
-    { value: "cloud", label: "词云" },
     { value: "timeline", label: "行程时间线" },
     { value: "graph", label: "知识图谱" }
   ],
   warfare: [
     { value: "battle", label: "对抗视图" },
-    { value: "cloud", label: "词云" },
     { value: "timeline", label: "战事时间线" },
     { value: "graph", label: "知识图谱" }
   ],
   biography: [
     { value: "family", label: "亲情树" },
-    { value: "cloud", label: "词云" },
     { value: "timeline", label: "生平时间线" },
     { value: "graph", label: "知识图谱" }
   ],
   default: [
-    { value: "cloud", label: "词云" },
     { value: "graph", label: "知识图谱" },
     { value: "timeline", label: "时间线" },
     { value: "map", label: "地图" }
