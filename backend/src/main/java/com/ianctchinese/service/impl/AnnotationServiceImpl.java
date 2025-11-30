@@ -68,4 +68,16 @@ public class AnnotationServiceImpl implements AnnotationService {
   public List<RelationAnnotation> getRelations(Long textId) {
     return relationRepository.findByTextDocumentId(textId);
   }
+
+  @Override
+  @Transactional
+  public void deleteEntity(Long id) {
+    entityRepository.deleteById(id);
+  }
+
+  @Override
+  @Transactional
+  public void deleteRelation(Long id) {
+    relationRepository.deleteById(id);
+  }
 }

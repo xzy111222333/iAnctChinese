@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { fetchTexts, fetchTextById, uploadText, updateTextCategory, exportText, deleteText as deleteTextApi, updateText as updateTextApi } from "@/api/texts";
-import { fetchEntities, fetchRelations, createEntity, createRelation } from "@/api/annotations";
+import { fetchEntities, fetchRelations, createEntity, createRelation, deleteEntity, deleteRelation } from "@/api/annotations";
 import { classifyText, fetchInsights, autoAnnotate, runFullAnalysis as runFullAnalysisApi } from "@/api/analysis";
 import { fetchSections, autoSegment, updateSection as updateSectionApi } from "@/api/sections";
 import { fetchNavigationTree } from "@/api/navigation";
@@ -133,6 +133,14 @@ export const useTextStore = defineStore("textStore", {
     async createRelationAnnotation(payload) {
       await createRelation(payload);
       await this.selectText(payload.textId);
+    },
+    async deleteEntityAnnotation(id) {
+      await deleteEntity(id);
+      this.entities = this.entities.filter(e => e.id !== id);
+    },
+    async deleteRelationAnnotation(id) {
+      await deleteRelation(id);
+      this.relations = this.relations.filter(r => r.id !== id);
     },
     async classifySelectedText(model) {
       if (!this.selectedTextId) {
