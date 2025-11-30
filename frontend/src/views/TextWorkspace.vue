@@ -84,9 +84,22 @@ import AnnotatorEditor from "@/components/workspace/AnnotatorEditor.vue";
 import InfoPanel from "@/components/workspace/InfoPanel.vue";
 import GraphView from "@/components/visualizations/GraphView.vue";
 
+const props = defineProps({
+  id: {
+    type: String,
+    required: true
+  }
+});
+
 const router = useRouter();
 const store = useTextStore();
 const currentTab = ref("entity");
+
+onMounted(async () => {
+  if (props.id) {
+    await store.selectText(props.id);
+  }
+});
 
 const handleBack = () => {
   router.push("/documents");
@@ -101,19 +114,26 @@ const handleCategorySelect = (category) => {
 
 const handleRemoveEntity = async (id) => {
   try {
-    // Assuming store has a delete action, if not we mock or skip
-    // store.deleteEntity(id); 
-    // Checking store capabilities from memory/previous file... 
-    // It seems previous file didn't use delete.
-    // Let's assume we can just refresh or ignore for now if API not ready.
-    ElMessage.info("删除功能待后端接口对接 (" + id + ")");
+    await store.deleteEntityAnnotation(id);
+    ElMessage.success("已删除实体");
   } catch (e) {
     console.error(e);
+    ElMessage.error("删除失败");
   }
 };
 
-const handleAddEntity = (data) => {
-  // logic to add entity
+const handleAddEntity = async (data) => {
+  try {
+    const payload = {
+      textId: store.selectedTextId,
+      ...data
+    };
+    await store.createEntityAnnotation(payload);
+    ElMessage.success("标注成功");
+  } catch (e) {
+    console.error(e);
+    ElMessage.error("标注失败");
+  }
 };
 
 const handleRunAnalysis = async () => {

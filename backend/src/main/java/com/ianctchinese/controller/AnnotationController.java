@@ -42,4 +42,16 @@ public class AnnotationController {
   public ResponseEntity<List<RelationAnnotation>> listRelations(@RequestParam("textId") Long textId) {
     return ResponseEntity.ok(annotationService.getRelations(textId));
   }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/entities/{id}")
+  public ResponseEntity<Void> deleteEntity(@org.springframework.web.bind.annotation.PathVariable Long id) {
+    annotationService.deleteEntity(id);
+    return ResponseEntity.noContent().build();
+  }
+
+  @org.springframework.web.bind.annotation.DeleteMapping("/relations/{id}")
+  public ResponseEntity<Void> deleteRelation(@org.springframework.web.bind.annotation.PathVariable Long id) {
+    annotationService.deleteRelation(id);
+    return ResponseEntity.noContent().build();
+  }
 }
