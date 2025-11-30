@@ -95,7 +95,7 @@ const formatDate = (dateStr) => {
   align-items: center;
   gap: 8px;
   padding: 0 20px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #1F2328;
   border-bottom: 1px solid #EDEEF0;

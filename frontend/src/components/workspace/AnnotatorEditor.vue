@@ -96,6 +96,16 @@ const getCategoryLabel = (key) => {
   return f ? f.label : key;
 };
 
+const escapeHtml = (str) => {
+  if (!str) return '';
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 // Simple text rendering with non-overlapping entities
 // For overlapping, we'd need a more complex tree builder.
 const renderedContent = computed(() => {
@@ -113,17 +123,17 @@ const renderedContent = computed(() => {
     if (entity.startOffset < lastIndex) continue; // Skip overlapping for now
 
     // Text before entity
-    result += text.slice(lastIndex, entity.startOffset);
+    result += escapeHtml(text.slice(lastIndex, entity.startOffset));
 
     // Entity
     const color = getCategoryColor(entity.category);
     // Using inline styles for dynamic colors, but classes for glow effects
-    result += `<span class="entity-highlight" data-id="${entity.id}" style="--entity-color: ${color}">${text.slice(entity.startOffset, entity.endOffset)}</span>`;
+    result += `<span class="entity-highlight" data-id="${entity.id}" style="--entity-color: ${color}">${escapeHtml(text.slice(entity.startOffset, entity.endOffset))}</span>`;
     
     lastIndex = entity.endOffset;
   }
 
-  result += text.slice(lastIndex);
+  result += escapeHtml(text.slice(lastIndex));
   
   // Convert newlines to breaks for display
   return result.replace(/\n/g, '<br/>');
@@ -286,7 +296,7 @@ const removeEntity = (id) => {
   transition: all 0.2s ease;
   
   /* Initial subtle glow */
-  box-shadow: 0 0 0 0 rgba(var(--entity-color), 0);
+  box-shadow: 0 0 0 0 transparent;
 }
 
 :deep(.entity-highlight:hover) {

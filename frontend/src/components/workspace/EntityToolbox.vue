@@ -88,7 +88,7 @@ const selectCategory = (key) => {
 }
 
 .title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #1F2328;
   margin: 0;

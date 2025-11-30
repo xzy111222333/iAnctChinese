@@ -1,5 +1,10 @@
-node_modules
+backend/target/
+node_modules/
+frontend/dist/
+dist/
+dist-ssr/
+.idea/
+.vscode/
+*.log
 .DS_Store
-dist
-dist-ssr
 *.local

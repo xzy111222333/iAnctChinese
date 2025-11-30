@@ -2,6 +2,7 @@
   <div class="workspace-layout">
     <WorkspaceHeader 
       v-model:currentTab="currentTab" 
+      @back="handleBack"
     />
     
     <div class="workspace-body">
@@ -75,6 +76,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useTextStore } from "@/store/textStore";
+import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import WorkspaceHeader from "@/components/workspace/WorkspaceHeader.vue";
 import EntityToolbox from "@/components/workspace/EntityToolbox.vue";
@@ -82,8 +84,13 @@ import AnnotatorEditor from "@/components/workspace/AnnotatorEditor.vue";
 import InfoPanel from "@/components/workspace/InfoPanel.vue";
 import GraphView from "@/components/visualizations/GraphView.vue";
 
+const router = useRouter();
 const store = useTextStore();
 const currentTab = ref("entity");
+
+const handleBack = () => {
+  router.push("/documents");
+};
 
 const handleCategorySelect = (category) => {
   // Logic to scroll to first entity of this category?

@@ -1,6 +1,9 @@
 <template>
   <header class="workspace-header">
     <div class="left-section">
+      <div class="back-btn" @click="$emit('back')">
+        <el-icon><ArrowLeft /></el-icon>
+      </div>
       <div class="logo">
         <span class="logo-icon">✦</span>
         <span class="logo-text">结构标注 / 智能标注</span>
@@ -40,7 +43,7 @@
 </template>
 
 <script setup>
-import { Setting, Search, Bell, QuestionFilled } from '@element-plus/icons-vue';
+import { Setting, Search, Bell, QuestionFilled, ArrowLeft } from '@element-plus/icons-vue';
 
 defineProps({
   currentTab: {
@@ -49,7 +52,7 @@ defineProps({
   }
 });
 
-defineEmits(['update:currentTab']);
+defineEmits(['update:currentTab', 'back']);
 
 const tabs = [
   { id: 'structure', label: '结构标注' },
@@ -77,6 +80,24 @@ const tabs = [
   display: flex;
   align-items: center;
   min-width: 200px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-right: 8px;
+  color: #596274;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: #F3F4F6;
+  color: #1F2328;
 }
 
 .logo {
