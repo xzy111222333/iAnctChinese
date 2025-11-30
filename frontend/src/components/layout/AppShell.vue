@@ -2,20 +2,24 @@
   <div class="shell">
     <header class="global-bar">
       <div class="title">
-        <span>iAnctChinese · 古籍智能标注平台</span>
-        <small>项目 | 类型 | 时间 | 范围 | 搜索 | 导出</small>
+        <span>{{ $t('greeting.welcome') }}</span>
+        <small>{{ $t('greeting.project') }} | {{ $t('greeting.type') }} | {{ $t('greeting.time') }} | {{ $t('greeting.scope') }} | {{ $t('greeting.searchNav') }} | {{ $t('greeting.exportNav') }}</small>
       </div>
       <div class="actions">
+        <el-select v-model="currentLocale" @change="changeLocale" size="large" style="width: 120px; margin-right: 12px;">
+          <el-option label="中文" value="zh-CN" />
+          <el-option label="English" value="en" />
+        </el-select>
         <el-input
           v-model="keywords"
-          placeholder="检索文言文 / 作者 / 标签"
+          :placeholder="$t('greeting.searchPlaceholder')"
           clearable
           prefix-icon="Search"
           size="large"
         />
-        <el-button type="primary" @click="emitSearch" size="large">搜索</el-button>
+        <el-button type="primary" @click="emitSearch" size="large">{{ $t('greeting.search') }}</el-button>
         <el-button :loading="props.exporting" :disabled="!props.canExport" @click="$emit('export')">
-          导出
+          {{ $t('greeting.export') }}
         </el-button>
       </div>
     </header>
@@ -27,6 +31,9 @@
 
 <script setup>
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { locale } = useI18n();
 
 const props = defineProps({
   exporting: {
@@ -40,10 +47,23 @@ const props = defineProps({
 });
 const emit = defineEmits(["search", "export"]);
 const keywords = ref("");
+const currentLocale = ref(locale.value);
+
+const changeLocale = (newLocale) => {
+  locale.value = newLocale;
+  localStorage.setItem('locale', newLocale);
+};
 
 const emitSearch = () => {
   emit("search", keywords.value);
 };
+
+// Initialize locale from localStorage
+const savedLocale = localStorage.getItem('locale');
+if (savedLocale) {
+  locale.value = savedLocale;
+  currentLocale.value = savedLocale;
+}
 </script>
 
 <style scoped>

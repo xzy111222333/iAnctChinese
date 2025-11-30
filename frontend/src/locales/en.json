@@ -1,0 +1,17 @@
+{
+  "greeting": {
+    "welcome": "Welcome to iAnctChinese",
+    "platform": "Ancient Chinese Text Intelligent Annotation Platform",
+    "description": "Intelligent annotation and knowledge graph demonstration project for ancient texts",
+    "search": "Search",
+    "export": "Export",
+    "searchPlaceholder": "Search classical texts / authors / tags",
+    "features": "Features",
+    "project": "Project",
+    "type": "Type", 
+    "time": "Time",
+    "scope": "Scope",
+    "searchNav": "Search",
+    "exportNav": "Export"
+  }
+}

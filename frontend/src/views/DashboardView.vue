@@ -1,5 +1,7 @@
 <template>
   <div class="dashboard-shell" v-loading="store.loading">
+    <GreetingDisplay />
+    
     <div class="stage-actions">
       <TextUploadDrawer />
       <el-button @click="store.initDashboard()">刷新数据</el-button>
@@ -149,6 +151,7 @@ import ClassificationBanner from "@/components/layout/ClassificationBanner.vue";
 import FamilyTreeView from "@/components/visualizations/FamilyTreeView.vue";
 import BattleTimelineView from "@/components/visualizations/BattleTimelineView.vue";
 import TextWorkspace from "./TextWorkspace.vue";
+import GreetingDisplay from "@/components/GreetingDisplay.vue";
 
 const store = useTextStore();
 const viewType = ref("stats");

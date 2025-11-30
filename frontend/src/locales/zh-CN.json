@@ -1,0 +1,17 @@
+{
+  "greeting": {
+    "welcome": "欢迎使用 iAnctChinese",
+    "platform": "古籍智能标注平台", 
+    "description": "基于 Spring Boot + Vue3 的古籍智能标注与知识图谱演示项目",
+    "search": "搜索",
+    "export": "导出",
+    "searchPlaceholder": "检索文言文 / 作者 / 标签",
+    "features": "功能特性",
+    "project": "项目",
+    "type": "类型",
+    "time": "时间", 
+    "scope": "范围",
+    "searchNav": "搜索",
+    "exportNav": "导出"
+  }
+}
