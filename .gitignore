@@ -1,6 +1,5 @@
-backend/target/
-node_modules/
-frontend/dist/
-.idea/
-.vscode/
-*.log
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
